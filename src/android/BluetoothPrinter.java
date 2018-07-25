@@ -317,8 +317,9 @@ public class BluetoothPrinter extends CordovaPlugin {
             int mWidth = bitmap.getWidth();
             int mHeight = bitmap.getHeight();
 
-            bitmap = resizeImage(bitmap, 60 * 8, mHeight);
-
+            bitmap = bitmap;
+            //bitmap = resizeImage(bitmap, 100 * 8, mHeight);
+            
             byte[] bt = decodeBitmap(bitmap);
 
             mmOutputStream.write(bt);
