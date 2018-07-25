@@ -303,40 +303,7 @@ public class BluetoothPrinter extends CordovaPlugin {
         return false;
     }
 
-   private byte[] recollectSlice(int y, int x, int[][] img) {
-        byte[] slices = new byte[] {0, 0, 0};
-        for (int yy = y, i = 0; yy < y + 24 && i < 3; yy += 8, i++) {
-            byte slice = 0;
-             for (int b = 0; b < 8; b++) {
-                        int yyy = yy + b;
-                 if (yyy >= img.length) {
-                     continue;
-                 }
-                 int col = img[yyy][x]; 
-                 boolean v = shouldPrintColor(col);
-                 slice |= (byte) ((v ? 1 : 0) << (7 - b));
-             }
-                    slices[i] = slice;
-                }
-
-                return slices;
-    }
-
-    private boolean shouldPrintColor(int col) {
-            final int threshold = 127;
-            int a, r, g, b, luminance;
-            a = (col >> 24) & 0xff;
-            if (a != 0xff) {// Ignore transparencies
-                return false;
-            }
-            r = (col >> 16) & 0xff;
-            g = (col >> 8) & 0xff;
-            b = col & 0xff;
-
-            luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
-
-            return luminance < threshold;
-    }
+  
     //This will send data to bluetooth printer
    boolean printImage(CallbackContext callbackContext, String msg) throws IOException {
 	
@@ -403,6 +370,40 @@ public class BluetoothPrinter extends CordovaPlugin {
     return false;
 }
 
+    private byte[] recollectSlice(int y, int x, int[][] img) {
+        byte[] slices = new byte[] {0, 0, 0};
+        for (int yy = y, i = 0; yy < y + 24 && i < 3; yy += 8, i++) {
+            byte slice = 0;
+             for (int b = 0; b < 8; b++) {
+                        int yyy = yy + b;
+                 if (yyy >= img.length) {
+                     continue;
+                 }
+                 int col = img[yyy][x]; 
+                 boolean v = shouldPrintColor(col);
+                 slice |= (byte) ((v ? 1 : 0) << (7 - b));
+             }
+                    slices[i] = slice;
+                }
+
+                return slices;
+    }
+
+    private boolean shouldPrintColor(int col) {
+            final int threshold = 127;
+            int a, r, g, b, luminance;
+            a = (col >> 24) & 0xff;
+            if (a != 0xff) {// Ignore transparencies
+                return false;
+            }
+            r = (col >> 16) & 0xff;
+            g = (col >> 8) & 0xff;
+            b = col & 0xff;
+
+            luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+
+            return luminance < threshold;
+    }
     //New implementation
     private static Bitmap resizeImage(Bitmap bitmap, int w, int h) {
         Bitmap BitmapOrg = bitmap;
