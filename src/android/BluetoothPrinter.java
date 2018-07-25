@@ -303,39 +303,105 @@ public class BluetoothPrinter extends CordovaPlugin {
         return false;
     }
 
-    //This will send data to bluetooth printer
-    boolean printImage(CallbackContext callbackContext, String msg) throws IOException {
-        try {
+   private byte[] recollectSlice(int y, int x, int[][] img) {
+        byte[] slices = new byte[] {0, 0, 0};
+        for (int yy = y, i = 0; yy < y + 24 && i < 3; yy += 8, i++) {
+            byte slice = 0;
+             for (int b = 0; b < 8; b++) {
+                        int yyy = yy + b;
+                 if (yyy >= img.length) {
+                     continue;
+                 }
+                 int col = img[yyy][x]; 
+                 boolean v = shouldPrintColor(col);
+                 slice |= (byte) ((v ? 1 : 0) << (7 - b));
+             }
+                    slices[i] = slice;
+                }
 
-            final String encodedString = msg;
-            final String pureBase64Encoded = encodedString.substring(encodedString.indexOf(",") + 1);
-            final byte[] decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT);
-
-            Bitmap decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
-
-            bitmap = decodedBitmap;
-            int mWidth = bitmap.getWidth();
-            int mHeight = bitmap.getHeight();
-
-            bitmap = bitmap;
-            //bitmap = resizeImage(bitmap, 100 * 8, mHeight);
-            
-            byte[] bt = decodeBitmap(bitmap);
-
-            mmOutputStream.write(bt);
-            // tell the user data were sent
-            //Log.d(LOG_TAG, "Data Sent");
-            callbackContext.success("Data Sent");
-            return true;
-
-        } catch (Exception e) {
-            String errMsg = e.getMessage();
-            Log.e(LOG_TAG, errMsg);
-            e.printStackTrace();
-            callbackContext.error(errMsg);
-        }
-        return false;
+                return slices;
     }
+
+    private boolean shouldPrintColor(int col) {
+            final int threshold = 127;
+            int a, r, g, b, luminance;
+            a = (col >> 24) & 0xff;
+            if (a != 0xff) {// Ignore transparencies
+                return false;
+            }
+            r = (col >> 16) & 0xff;
+            g = (col >> 8) & 0xff;
+            b = col & 0xff;
+
+            luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+
+            return luminance < threshold;
+    }
+    //This will send data to bluetooth printer
+   boolean printImage(CallbackContext callbackContext, String msg) throws IOException {
+	
+    try {
+        final String encodedString = msg;
+        final String pureBase64Encoded = encodedString.substring(encodedString.indexOf(",")  + 1);
+
+        final byte[] decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT);
+
+        Bitmap decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+
+        bitmap = decodedBitmap;
+
+        int mWidth = bitmap.getWidth();
+        int mHeight = bitmap.getHeight();
+        
+        int[][] result = new int[mHeight][mWidth];
+        for (int row = 0; row < mHeight; row++) {
+            for (int col = 0; col < mWidth; col++) {
+                result[row][col] = bitmap.getPixel(col, row);
+            }
+        }
+        
+     // Set the line spacing at 24 (we'll print 24 dots high)
+        mmOutputStream.write(SET_LINE_SPACE_24);
+        for (int y = 0; y < result.length; y += 24) {
+         // Like I said before, when done sending data, 
+         // the printer will resume to normal text printing
+        	mmOutputStream.write(SELECT_BIT_IMAGE_MODE);
+         // Set nL and nH based on the width of the image
+        	mmOutputStream.write(new byte[]{(byte)(0x00ff & result[y].length)
+                                    , (byte)((0xff00 & result[y].length) >> 8)});
+         for (int x = 0; x < result[y].length; x++) {
+          // for each stripe, recollect 3 bytes (3 bytes = 24 bits)
+        	 mmOutputStream.write(recollectSlice(y, x, result));
+         }
+        
+         // Do a line feed, if not the printing will resume on the same line
+         mmOutputStream.write(LINE_FEED);
+        }
+        mmOutputStream.write(SET_LINE_SPACE_30);
+        //bitmap=resizeImage(bitmap, imageWidth * 8, mHeight);
+        //bitmap=resizeImage(bitmap, 48 * 8, mHeight);
+        
+
+        //byte[]  bt =getBitmapData(bitmap);
+
+        //bitmap.recycle();
+
+        //mmOutputStream.write(bt);
+
+        // tell the user data were sent
+        //Log.d(LOG_TAG, "Data Sent");
+        callbackContext.success("Data Sent");
+        return true;
+
+
+    } catch (Exception e) {
+        String errMsg = e.getMessage();
+        Log.e(LOG_TAG, errMsg);
+        e.printStackTrace();
+        callbackContext.error(errMsg);
+    }
+    return false;
+}
 
     //New implementation
     private static Bitmap resizeImage(Bitmap bitmap, int w, int h) {
